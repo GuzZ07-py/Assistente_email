@@ -13,10 +13,8 @@ import re
 import psycopg2
 from dotenv import load_dotenv
 # --- CONFIGURAZIONE ---
-API_KEY_GEMINI = "AIzaSyCUlHTJ3zOTMizYJ0wzcwIqoRWsOvD-vhI"
-
-
-GOOGLE_MAPS_API_KEY="AIzaSyB3eWwYSNSaU2rvuFeXAFRGcyKkY_hK8P4"
+API_KEY_GEMINI = os.getenv("API_KEY_GEMINI")
+GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
 SCOPES = [
     'https://www.googleapis.com/auth/gmail.modify',
     'https://www.googleapis.com/auth/gmail.send',
