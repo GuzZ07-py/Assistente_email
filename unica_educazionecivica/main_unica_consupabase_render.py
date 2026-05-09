@@ -109,13 +109,14 @@ def inserisci_ordine(json_data: str):
         else:
             cursor.execute("""
             INSERT INTO clienti (nome, email, indirizzo)
-            VALUES (%s, %s, %s)""", 
+            VALUES (%s, %s, %s)
+            RETURNING id""", 
             (
             data["cliente"]["nome"],
             data["cliente"]["email"],
             data["cliente"]["indirizzo"]
             ))
-            cliente_id = cursor.lastrowid
+            cliente_id = cursor.fetchone()[0]
         print("ok cliente")
         # 2. CARTA
             #controllo se gia presente
@@ -127,7 +128,8 @@ def inserisci_ordine(json_data: str):
         else:
             cursor.execute("""
             INSERT INTO carte (cliente_id, last4, circuito, scadenza, token)
-            VALUES (%s, %s, %s, %s, %s)""", 
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id""", 
             (
             cliente_id,
             data["carta"]["last4"],
@@ -135,7 +137,7 @@ def inserisci_ordine(json_data: str):
             data["carta"]["scadenza"],
             data["carta"]["token"]
             ))
-            carta_id = cursor.lastrowid
+            carta_id = cursor.fetchone()[0]
         print("ok carte")
 
 
@@ -146,8 +148,8 @@ def inserisci_ordine(json_data: str):
         if result:
             corriere_id = result[0]
         else:
-            cursor.execute("INSERT INTO corrieri (nome) VALUES (%s)", (data["corriere"]["nome"],))
-            corriere_id = cursor.lastrowid
+            cursor.execute("INSERT INTO corrieri (nome) VALUES (%s) RETURNING id", (data["corriere"]["nome"],))
+            corriere_id = cursor.fetchone()[0]
         print("ok corrieri")
         # 4. ORDINE
 
@@ -156,7 +158,7 @@ def inserisci_ordine(json_data: str):
         cursor.execute("""
             INSERT INTO ordini 
             (data_spedizione, data_arrivo, tracking, stato, origine, cliente_id, corriere_id, carta_id)
-            VALUES ( %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES ( %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
         """, (
             
             data["ordine"]["data_spedizione"],
@@ -168,7 +170,31 @@ def inserisci_ordine(json_data: str):
             corriere_id,
             carta_id
         ))
+
+        ordine_id=cursor.fetchone()[0]
         print("ok ordini")
+        #5 PRODOTTO 
+        cursor.execute("SELECT id FROM prodotti WHERE nome=%s", (data["prodotto"]["nome"],)
+        )
+        result= cursor.fetchone()
+        if result:
+            prodotto_id=result[0] # i prodotti sono questi
+            print("ok prodotti")
+        else:
+            raise Exception(f"Prodotto {data["prodotto"]["nome"]} non trovato")
+        
+        #6 ordini_prodotti
+        
+        cursor.execute("""INSERT INTO ordini_prodotti (ordine_id,prodotto_id,quantita) VALUES (%s,%s,%s)""",
+                       (
+                           ordine_id,
+                           prodotto_id,
+                           data["prodotto"]["quantita"]
+                       ))
+
+       
+
+        print("ok ordini_prodotti")
         conn.commit()
         print("commit OK")
         conn.close()
@@ -269,10 +295,10 @@ def process_last_email():
 
     print(f"--- Email Ricevuta ---\n{body}\n----------------------")
 
-    # Inizializza Gemini con la funzione di tracciamento
+    
     model = genai.GenerativeModel(
-        model_name='gemini-2.5-pro', # La tua versione
-        tools=[stima_consegna,esegui_query]
+        model_name='gemini-2.5-pro', 
+        tools=[stima_consegna,esegui_query] # Function Calling
     )
     
     chat = model.start_chat(enable_automatic_function_calling=True)
