@@ -31,14 +31,7 @@ load_dotenv()
 # Fetch variables
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-#def get_db_connection():
-    #return psycopg2.connect(
-        #host="aws-0-eu-west-1.pooler.supabase.com",
-        #user="postgres.ohwvwolmefolpexwmlhf",
-        #password="Lautaro21$12",
-        #database="postgres",
-        #port=6543
-    #)
+
 
 def esegui_query(query: str):
     #sicurezza
