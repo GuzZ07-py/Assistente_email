@@ -12,9 +12,12 @@ import json
 import re
 import psycopg2
 from dotenv import load_dotenv
+import time
 # --- CONFIGURAZIONE ---
-API_KEY_GEMINI = os.getenv("API_KEY_GEMINI")
-GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
+API_KEY_GEMINI = os.getenv("API_GEMINI_KEY")
+
+
+GOOGLE_MAPS_API_KEY= os.getenv("GOOGLE_MAPS_API_KEY")
 SCOPES = [
     'https://www.googleapis.com/auth/gmail.modify',
     'https://www.googleapis.com/auth/gmail.send',
@@ -174,14 +177,14 @@ def inserisci_ordine(json_data: str):
         ordine_id=cursor.fetchone()[0]
         print("ok ordini")
         #5 PRODOTTO 
-        cursor.execute("SELECT id FROM prodotti WHERE nome=%s", (data["prodotto"]["nome"],)
+        cursor.execute("SELECT id FROM prodotti WHERE nome=%s", (data["prodotti"]["nome"],)
         )
         result= cursor.fetchone()
         if result:
             prodotto_id=result[0] # i prodotti sono questi
             print("ok prodotti")
         else:
-            raise Exception(f"Prodotto {data["prodotto"]["nome"]} non trovato")
+            raise Exception(f"Prodotto {data["prodotti"]["nome"]} non trovato")
         
         #6 ordini_prodotti
         
@@ -189,7 +192,7 @@ def inserisci_ordine(json_data: str):
                        (
                            ordine_id,
                            prodotto_id,
-                           data["prodotto"]["quantita"]
+                           data["ordini_prodotti"]["quantita"]
                        ))
 
        
@@ -203,50 +206,6 @@ def inserisci_ordine(json_data: str):
 
     except Exception as e:
         return f"Errore inserimento: {e}"
-# 1. FUNZIONE COMPLICATA (IL TOOL)
-#def traccia_spedizione(id_ordine: str):
-    """Cerca lo stato di un ordine leggendo direttamente da Google Sheets."""
-    try:
-        creds = get_credentials()
-        service = build('sheets', 'v4', credentials=creds)
-
-        result = service.spreadsheets().values().get(
-            spreadsheetId=SPREADSHEET_ID,
-            range=RANGE_NAME
-        ).execute()
-
-        values = result.get('values', [])
-
-        if not values:
-            return "Il database ordini è vuoto."
-
-        # Salta intestazione (prima riga)
-        for row in values[1:]:
-            if len(row) > 0 and row[0].strip().upper() == id_ordine.strip().upper():
-
-                quando_spedito = row[1] if len(row) > 1 else "N/D"
-                da_dove = row[2] if len(row) > 2 else "N/D"
-                tracking = row[3] if len(row) > 3 else "N/D"
-                arrivo = row[4] if len(row) > 4 else "N/D"
-                corriere = row[5] if len(row) > 5 else "N/D"
-                destinazione = row[6] if len(row) > 6 else "N/D"
-                stato = row[7] if len(row) > 7 else "N/D"
-
-                return (
-                    f"Ordine {id_ordine}:\n"
-                    f"- Spedito: {quando_spedito}\n"
-                    f"- Da: {da_dove}\n"
-                    f"- Corriere: {corriere}\n"
-                    f"- Tracking: {tracking}\n"
-                    f"- Arrivo stimato: {arrivo}\n"
-                    f"- Indirizzo del Destinatario: {destinazione}\n"
-                    f"- Stato della Consegna: {stato}\n"
-                )
-
-        return f"Ordine {id_ordine} non trovato."
-
-    except Exception as e:
-        return f"Errore nel recupero dati: {e}"
 
 # 2. AUTENTICAZIONE GMAIL
 
@@ -295,10 +254,10 @@ def process_last_email():
 
     print(f"--- Email Ricevuta ---\n{body}\n----------------------")
 
-    
+    # Inizializza Gemini con la funzione di tracciamento
     model = genai.GenerativeModel(
-        model_name='gemini-2.5-pro', 
-        tools=[stima_consegna,esegui_query] # Function Calling
+        model_name='gemini-2.5-pro', # La tua versione
+        tools=[stima_consegna,esegui_query]
     )
     
     chat = model.start_chat(enable_automatic_function_calling=True)
@@ -422,4 +381,10 @@ def process_last_email():
     # service.users().messages().batchModify(userId='me', body={'removeLabelIds': ['UNREAD'], 'ids': [messages[0]['id']]}).execute()
 
 if __name__ == "__main__":
-    process_last_email()
+    while True:
+        try:
+            process_last_email()
+        except Exception as e:
+            print("Errore:",e)
+
+        time.sleep(30)
